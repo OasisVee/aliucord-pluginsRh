@@ -18,6 +18,7 @@ import android.os.Bundle;
 import com.aliucord.Utils;
 //import com.aliucord.utils.ReflectUtils;
 import com.discord.widgets.media.WidgetMedia;
+import com.discord.utilities.intent.IntentUtils;
 import android.widget.Toast;
 
 import com.discord.app.AppFragment;
@@ -103,6 +104,10 @@ public class CopyInsteadOfShareImages extends Plugin {
 			var binding = WidgetMedia.access$getBinding$p((WidgetMedia) callFrame.thisObject);
 			var root = binding.getRoot();
 			var shareButton = root.findViewById(shareButtonId);
+
+			//The buttons are located in WidgetMedia$onViewBoundOrOnResume$1
+			// public final class b implements Toolbar.OnMenuItemClickListener
+			// package b.a.d;
 			
 			try {
 				//Old (Doesn't work for embeds and stuff)
@@ -126,6 +131,18 @@ public class CopyInsteadOfShareImages extends Plugin {
 							Utils.setClipboard(null,imageUriFinal);
 							Toast.makeText(context, "Copied "+imageUriFinal, Toast.LENGTH_SHORT).show();
 						}
+					});
+
+					/*
+					m.checkNotNullExpressionValue(context, "context");
+					   String uri2 = this.$sourceUri.toString();
+					m.checkNotNullExpressionValue(uri2, "sourceUri.toString()");
+					IntentUtils.performChooserSendIntent$default(context, uri2, null, 4, null);
+					 */
+					shareButton.setOnLongClickListener((View.OnLongClickListener) v -> {
+						Toolbar toolbar = root.findViewById(Utils.getResId("action_bar_toolbar","id"));
+						IntentUtils.performChooserSendIntent$default(toolbar.getContext(),imageUriFinal,null,4,null);
+						return true;
 					});
 					
 					
