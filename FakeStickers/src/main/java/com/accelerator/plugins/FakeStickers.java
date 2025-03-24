@@ -44,12 +44,12 @@ public class FakeStickers extends Plugin {
                 if (ReflectUtils.getField(param.args[0], "sendability") == StickerUtils.StickerSendability.SENDABLE) return;
 
                 var sticker = ((StickerItem) param.args[0]).getSticker();
-                String formatType = sticker.getFormatType().name(); // Assuming getFormatType() returns an enum
+                int formatType = (int) ReflectUtils.getField(sticker, "format_type");
 
                 String stickerUrl = "https://media.discordapp.net/stickers/" + sticker.d() + sticker.b();
-                if ("GIF".equals(formatType)) {
+                if (formatType == 1) { // 1 corresponds to GIF
                     stickerUrl += ".gif";
-                } else if ("LOTTIE".equals(formatType)) {
+                } else if (formatType == 3) { // 3 corresponds to Lottie
                     stickerUrl += ".json"; // Assuming .json for Lottie
                 } else {
                     stickerUrl += ".png?size=160";
