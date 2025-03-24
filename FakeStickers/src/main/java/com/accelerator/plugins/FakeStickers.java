@@ -15,16 +15,12 @@ import com.discord.widgets.chat.input.WidgetChatInputAttachments$createAndConfig
 import com.discord.widgets.chat.input.sticker.*;
 import com.discord.utilities.stickers.StickerUtils;
 import com.discord.utilities.rest.RestAPI;
-//import com.discord.restapi.*;
 import com.discord.restapi.RestAPIParams;
 import com.discord.models.domain.NonceGenerator;
 import com.discord.utilities.time.ClockFactory;
 import com.aliucord.utils.RxUtils;
 import java.util.Collections;
 import com.discord.stores.StoreStream;
-//import org.json.JSONObject;
-//import com.discord.utilities.analytics.AnalyticSuperProperties;
-//import com.aliucord.Http;
 
 // This class is never used so your IDE will likely complain. Let's make it shut up!
 @SuppressWarnings("unused")
@@ -48,10 +44,13 @@ public class FakeStickers extends Plugin {
                 if (ReflectUtils.getField(param.args[0], "sendability") == StickerUtils.StickerSendability.SENDABLE) return;
 
                 var sticker = ((StickerItem) param.args[0]).getSticker();
+                String formatType = sticker.getFormatType().name(); // Assuming getFormatType() returns an enum
 
                 String stickerUrl = "https://media.discordapp.net/stickers/" + sticker.d() + sticker.b();
-                if (sticker.isAnimated()) {
+                if ("GIF".equals(formatType)) {
                     stickerUrl += ".gif";
+                } else if ("LOTTIE".equals(formatType)) {
+                    stickerUrl += ".json"; // Assuming .json for Lottie
                 } else {
                     stickerUrl += ".png?size=160";
                 }
