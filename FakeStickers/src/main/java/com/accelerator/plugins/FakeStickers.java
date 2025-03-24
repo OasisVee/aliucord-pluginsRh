@@ -33,67 +33,73 @@ public class FakeStickers extends Plugin {
 
     public FakeStickers() {}
 
-	@Override
-	// Called when your plugin is started. This is the place to register command, add patches, etc
-	public void start(Context context) throws Throwable {
-		// add the patch
-		
+    @Override
+    // Called when your plugin is started. This is the place to register commands, add patches, etc.
+    public void start(Context context) throws Throwable {
+        // add the patch
 
-		// Do not mark stickers as unsendable (grey overlay)
-		patcher.patch(StickerItem.class.getDeclaredMethod("getSendability"), InsteadHook.returnConstant(StickerUtils.StickerSendability.SENDABLE));
+        // Do not mark stickers as unsendable (grey overlay)
+        patcher.patch(StickerItem.class.getDeclaredMethod("getSendability"), InsteadHook.returnConstant(StickerUtils.StickerSendability.SENDABLE));
 
-		//Patch onClick to send sticker
-		patcher.patch(WidgetStickerPicker.class.getDeclaredMethod("onStickerItemSelected", StickerItem.class), new PreHook(param -> {
-			try {
-				// getSendability is patched above to always return SENDABLE so get the real value via reflect
-				if (ReflectUtils.getField(param.args[0], "sendability") == StickerUtils.StickerSendability.SENDABLE) return;
+        // Patch onClick to send sticker
+        patcher.patch(WidgetStickerPicker.class.getDeclaredMethod("onStickerItemSelected", StickerItem.class), new PreHook(param -> {
+            try {
+                // getSendability is patched above to always return SENDABLE so get the real value via reflect
+                if (ReflectUtils.getField(param.args[0], "sendability") == StickerUtils.StickerSendability.SENDABLE) return;
 
-				var sticker = ((StickerItem) param.args[0]).getSticker();
+                var sticker = ((StickerItem) param.args[0]).getSticker();
 
-				RestAPIParams.Message message = new RestAPIParams.Message(
-					"https://media.discordapp.net/stickers/"+sticker.d()+sticker.b()+"?size=160",
-					Long.toString(NonceGenerator.computeNonce(ClockFactory.get())),
-					null,
-					null,
-					Collections.emptyList(),
-					null,
-					new RestAPIParams.Message.AllowedMentions(
-							Collections.emptyList(),
-							Collections.emptyList(),
-							Collections.emptyList(),
-							false
-					),
-					null,
-					null
-				);
-				new Logger("FakeStickers").debug(message.toString());
-				Utils.threadPool.execute(() -> {
-					//Subscriptions in Java, because you can't do msg.subscribe() like in Kotlin
-					RxUtils.subscribe(
-							RestAPI.getApi().sendMessage(StoreStream.getChannelsSelected().getId(), message),
-							RxUtils.createActionSubscriber(zz -> {})
-					);
-				});
+                String stickerUrl = "https://media.discordapp.net/stickers/" + sticker.d() + sticker.b();
+                if (sticker.isAnimated()) {
+                    stickerUrl += ".gif";
+                } else {
+                    stickerUrl += ".png?size=160";
+                }
 
-				// Skip original method
-				param.setResult(null);
+                RestAPIParams.Message message = new RestAPIParams.Message(
+                    stickerUrl,
+                    Long.toString(NonceGenerator.computeNonce(ClockFactory.get())),
+                    null,
+                    null,
+                    Collections.emptyList(),
+                    null,
+                    new RestAPIParams.Message.AllowedMentions(
+                            Collections.emptyList(),
+                            Collections.emptyList(),
+                            Collections.emptyList(),
+                            false
+                    ),
+                    null,
+                    null
+                );
+                new Logger("FakeStickers").debug(message.toString());
+                Utils.threadPool.execute(() -> {
+                    // Subscriptions in Java, because you can't do msg.subscribe() like in Kotlin
+                    RxUtils.subscribe(
+                            RestAPI.getApi().sendMessage(StoreStream.getChannelsSelected().getId(), message),
+                            RxUtils.createActionSubscriber(zz -> {})
+                    );
+                });
 
-				// Dismiss sticker picker
-				var stickerListener = (WidgetChatInputAttachments$createAndConfigureExpressionFragment$stickerPickerListener$1) // What a classname jeez
-						ReflectUtils.getField(param.thisObject, "stickerPickerListener");
-				//.s here is FlexInputFragment's FlexInputViewModel property (obfuscated to s)
-				WidgetChatInputAttachments.access$getFlexInputFragment$p(stickerListener.this$0).s.hideExpressionTray();
-			} catch (Throwable ignored) {
-			}
-		}));
-	}
+                // Skip original method
+                param.setResult(null);
 
-	@Override
-	// Called when your plugin is stopped
-	public void stop(Context context) {
-		// Remove all patches
-		patcher.unpatchAll();
-	}
+                // Dismiss sticker picker
+                var stickerListener = (WidgetChatInputAttachments$createAndConfigureExpressionFragment$stickerPickerListener$1) // What a classname jeez
+                        ReflectUtils.getField(param.thisObject, "stickerPickerListener");
+                //.s here is FlexInputFragment's FlexInputViewModel property (obfuscated to s)
+                WidgetChatInputAttachments.access$getFlexInputFragment$p(stickerListener.this$0).s.hideExpressionTray();
+            } catch (Throwable ignored) {
+            }
+        }));
+    }
+
+    @Override
+    // Called when your plugin is stopped
+    public void stop(Context context) {
+        // Remove all patches
+        patcher.unpatchAll();
+    }
 }
 
 /*
