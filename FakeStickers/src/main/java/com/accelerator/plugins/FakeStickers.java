@@ -21,6 +21,7 @@ import com.discord.utilities.time.ClockFactory;
 import com.aliucord.utils.RxUtils;
 import java.util.Collections;
 import com.discord.stores.StoreStream;
+import java.lang.reflect.Method;
 
 @SuppressWarnings("unused")
 @AliucordPlugin
@@ -54,9 +55,13 @@ public class FakeStickers extends Plugin {
                 var stickerItem = (StickerItem) param.args[0];
                 var sticker = stickerItem.getSticker();
                 
-                // Always make sticker fully opaque
-                var stickerView = ReflectUtils.getField(param.thisObject, "binding.b");
-                ReflectUtils.setField(param.thisObject, "binding.b", 1.0f, "setAlpha");
+                // Get the binding and StickerView via reflection
+                Object binding = ReflectUtils.getField(param.thisObject, "binding");
+                Object stickerView = ReflectUtils.getField(binding, "b");
+
+                // Use reflection to set alpha
+                Method setAlphaMethod = stickerView.getClass().getMethod("setAlpha", float.class);
+                setAlphaMethod.invoke(stickerView, 1.0f);
                 
                 // Add animation support for PNG/APNG stickers
                 if (sticker != null) {
@@ -101,10 +106,11 @@ public class FakeStickers extends Plugin {
                 // Skip original method
                 param.setResult(null);
 
-                // Dismiss sticker picker
-                var stickerListener = (WidgetChatInputAttachments$createAndConfigureExpressionFragment$stickerPickerListener$1)
-                        ReflectUtils.getField(param.thisObject, "stickerPickerListener");
-                WidgetChatInputAttachments.access$getFlexInputFragment$p(stickerListener.this$0).s.hideExpressionTray();
+                // Use different approach to dismiss sticker picker
+                Object flexInputFragment = ReflectUtils.getField(param.thisObject, "flexInputFragment");
+                Object flexInputViewModel = ReflectUtils.getField(flexInputFragment, "r");
+                Method hideMethod = flexInputViewModel.getClass().getMethod("hideExpressionTray");
+                hideMethod.invoke(flexInputViewModel);
             } catch (Throwable ignored) {
             }
         }));
