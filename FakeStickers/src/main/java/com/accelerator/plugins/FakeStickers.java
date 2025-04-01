@@ -56,7 +56,7 @@ public class FakeStickers extends Plugin {
     @Override
     public void start(Context context) throws Throwable {
         // Register settings tab
-        settings.init("enhanced_stickers");
+        settings.setString("enhanced_stickers", "enabled");
         settingsTab = new SettingsTab(FakeStickersSettings.class, SettingsTab.Type.BOTTOM_SHEET).withArgs(settings);
 
         // Do not mark stickers as unsendable (grey overlay)
@@ -203,4 +203,4 @@ public class FakeStickers extends Plugin {
             addView(note);
         }
     }
-	    }
+}
