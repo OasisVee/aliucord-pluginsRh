@@ -36,6 +36,9 @@ import java.util.Collections;
 import java.lang.reflect.Field;
 import com.discord.stores.StoreStream;
 
+// Add the missing import
+import com.aliucord.patcher.AfterHook;
+
 @SuppressWarnings("unused")
 @AliucordPlugin
 public class FakeStickers extends Plugin {
