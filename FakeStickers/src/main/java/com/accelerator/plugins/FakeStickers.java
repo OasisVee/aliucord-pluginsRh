@@ -1,6 +1,12 @@
 package com.accelerator.plugins;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup.LayoutParams;
+import android.widget.*;
+import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.ImageView;
 
 import com.aliucord.Http;
@@ -9,7 +15,12 @@ import com.aliucord.annotations.AliucordPlugin;
 import com.aliucord.entities.Plugin;
 import com.aliucord.patcher.InsteadHook;
 import com.aliucord.patcher.PreHook;
+import com.aliucord.api.SettingsAPI;
 import com.aliucord.utils.ReflectUtils;
+import com.aliucord.utils.DimenUtils;
+import com.aliucord.views.Button;
+import com.aliucord.widgets.BottomSheet;
+import com.aliucord.settings.delegate;
 
 import com.discord.widgets.chat.input.WidgetChatInputAttachments;
 import com.discord.widgets.chat.input.sticker.*;
@@ -22,10 +33,14 @@ import com.aliucord.utils.RxUtils;
 import java.util.Collections;
 import com.discord.stores.StoreStream;
 import java.lang.reflect.Method;
+import com.lytefast.flexinput.R;
 
 @SuppressWarnings("unused")
 @AliucordPlugin
 public class FakeStickers extends Plugin {
+
+    private static final int DEFAULT_STICKER_SIZE = 240;
+    private int stickerSize;
 
     private void initApngSticker(ImageView view, String stickerUrl, Integer w, Integer h) {
         final var url = stickerUrl
@@ -34,7 +49,7 @@ public class FakeStickers extends Plugin {
 
         Utils.threadPool.execute(() -> {
             try (var is = new Http.Request(url).execute().stream()) {
-                var drawable = b.l.a.a.a(is, w != null ? w : 160, h != null ? h : 160);
+                var drawable = b.l.a.a.a(is, w != null ? w : stickerSize, h != null ? h : stickerSize);
                 if (view != null)
                     Utils.mainThread.post(() -> {
                         view.setImageDrawable(drawable);
@@ -46,10 +61,19 @@ public class FakeStickers extends Plugin {
 
     @Override
     public void start(Context context) throws Throwable {
+        // Load sticker size from settings
+        stickerSize = settings.getInt("stickerSize", DEFAULT_STICKER_SIZE);
+
+        // Add settings tab
+        settingsTab = new SettingsTab(
+            FakeStickersSettings.class,
+            SettingsTab.Type.BOTTOM_SHEET
+        ).withArgs(settings);
+
         // Do not mark stickers as unsendable (grey overlay)
         patcher.patch(StickerItem.class.getDeclaredMethod("getSendability"), InsteadHook.returnConstant(StickerUtils.StickerSendability.SENDABLE));
 
-        // Patch StickerViewHolder to support animated stickers
+        // Patch StickerViewHolder to support animated stickers and configurable size
         patcher.patch(StickerViewHolder.class.getDeclaredMethod("configureSticker", Object.class), new PreHook(param -> {
             try {
                 var stickerItem = (StickerItem) param.args[0];
@@ -58,6 +82,12 @@ public class FakeStickers extends Plugin {
                 // Get the binding and StickerView via reflection
                 Object binding = ReflectUtils.getField(param.thisObject, "binding");
                 Object stickerView = ReflectUtils.getField(binding, "b");
+                
+                // Set custom sticker size
+                LayoutParams layoutParams = ((View) stickerView).getLayoutParams();
+                layoutParams.height = stickerSize;
+                layoutParams.width = stickerSize;
+                ((View) stickerView).setLayoutParams(layoutParams);
 
                 // Use reflection to set alpha
                 Method setAlphaMethod = stickerView.getClass().getMethod("setAlpha", float.class);
@@ -65,8 +95,8 @@ public class FakeStickers extends Plugin {
                 
                 // Add animation support for PNG/APNG stickers
                 if (sticker != null) {
-                    var stickerUrl = "https://media.discordapp.net/stickers/" + sticker.d() + sticker.b() + "?size=160";
-                    initApngSticker((ImageView) stickerView, stickerUrl, 160, 160);
+                    var stickerUrl = "https://media.discordapp.net/stickers/" + sticker.d() + sticker.b() + "?size=" + stickerSize;
+                    initApngSticker((ImageView) stickerView, stickerUrl, stickerSize, stickerSize);
                 }
             } catch (Throwable ignored) {}
         }));
@@ -80,7 +110,7 @@ public class FakeStickers extends Plugin {
                 var sticker = ((StickerItem) param.args[0]).getSticker();
 
                 RestAPIParams.Message message = new RestAPIParams.Message(
-                    "https://media.discordapp.net/stickers/"+sticker.d()+sticker.b()+"?size=160",
+                    "https://media.discordapp.net/stickers/"+sticker.d()+sticker.b()+"?size="+stickerSize,
                     Long.toString(NonceGenerator.computeNonce(ClockFactory.get())),
                     null,
                     null,
