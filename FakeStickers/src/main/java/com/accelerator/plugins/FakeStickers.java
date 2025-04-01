@@ -1,120 +1,206 @@
 package com.accelerator.plugins;
 
 import android.content.Context;
+import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup.LayoutParams;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
 
 import com.aliucord.annotations.AliucordPlugin;
+import com.aliucord.api.SettingsAPI;
 import com.aliucord.entities.Plugin;
 import com.aliucord.patcher.*;
-
 import com.aliucord.Logger;
 import com.aliucord.Utils;
-
+import com.aliucord.utils.DimenUtils;
 import com.aliucord.utils.ReflectUtils;
+import com.aliucord.views.Button;
+import com.aliucord.widgets.BottomSheet;
 import com.discord.widgets.chat.input.WidgetChatInputAttachments;
 import com.discord.widgets.chat.input.WidgetChatInputAttachments$createAndConfigureExpressionFragment$stickerPickerListener$1;
 import com.discord.widgets.chat.input.sticker.*;
 import com.discord.utilities.stickers.StickerUtils;
 import com.discord.utilities.rest.RestAPI;
-//import com.discord.restapi.*;
 import com.discord.restapi.RestAPIParams;
 import com.discord.models.domain.NonceGenerator;
 import com.discord.utilities.time.ClockFactory;
 import com.aliucord.utils.RxUtils;
-import java.util.Collections;
-import com.discord.stores.StoreStream;
-//import org.json.JSONObject;
-//import com.discord.utilities.analytics.AnalyticSuperProperties;
-//import com.aliucord.Http;
+import com.discord.databinding.WidgetChatListAdapterItemStickerBinding;
+import com.discord.widgets.chat.list.adapter.WidgetChatListAdapterItemSticker;
+import com.discord.widgets.chat.list.entries.ChatListEntry;
+import com.lytefast.flexinput.R;
 
-// This class is never used so your IDE will likely complain. Let's make it shut up!
+import java.util.Collections;
+import java.lang.reflect.Field;
+import com.discord.stores.StoreStream;
+
 @SuppressWarnings("unused")
 @AliucordPlugin
 public class FakeStickers extends Plugin {
 
-    public FakeStickers() {}
+    private static final String DEFAULT_STICKER_SIZE = "240";
+    private Field bindingField;
+    private Logger logger = new Logger("FakeStickers");
 
-	@Override
-	// Called when your plugin is started. This is the place to register command, add patches, etc
-	public void start(Context context) throws Throwable {
-		// add the patch
-		
+    public FakeStickers() {
+        try {
+            bindingField = WidgetChatListAdapterItemSticker.class.getDeclaredField("binding");
+            bindingField.setAccessible(true);
+        } catch (NoSuchFieldException e) {
+            logger.error("Failed to get binding field", e);
+        }
+    }
 
-		// Do not mark stickers as unsendable (grey overlay)
-		patcher.patch(StickerItem.class.getDeclaredMethod("getSendability"), InsteadHook.returnConstant(StickerUtils.StickerSendability.SENDABLE));
+    @Override
+    public void start(Context context) throws Throwable {
+        // Register settings tab
+        settings.init("enhanced_stickers");
+        settingsTab = new SettingsTab(FakeStickersSettings.class, SettingsTab.Type.BOTTOM_SHEET).withArgs(settings);
 
-		//Patch onClick to send sticker
-		patcher.patch(WidgetStickerPicker.class.getDeclaredMethod("onStickerItemSelected", StickerItem.class), new PreHook(param -> {
-			try {
-				// getSendability is patched above to always return SENDABLE so get the real value via reflect
-				if (ReflectUtils.getField(param.args[0], "sendability") == StickerUtils.StickerSendability.SENDABLE) return;
+        // Do not mark stickers as unsendable (grey overlay)
+        patcher.patch(StickerItem.class.getDeclaredMethod("getSendability"), InsteadHook.returnConstant(StickerUtils.StickerSendability.SENDABLE));
 
-				var sticker = ((StickerItem) param.args[0]).getSticker();
+        // Patch onClick to send sticker
+        patcher.patch(WidgetStickerPicker.class.getDeclaredMethod("onStickerItemSelected", StickerItem.class), new PreHook(param -> {
+            try {
+                // getSendability is patched above to always return SENDABLE so get the real value via reflect
+                if (ReflectUtils.getField(param.args[0], "sendability") == StickerUtils.StickerSendability.SENDABLE) return;
 
-				RestAPIParams.Message message = new RestAPIParams.Message(
-					"https://media.discordapp.net/stickers/"+sticker.d()+sticker.b()+"?size=160",
-					Long.toString(NonceGenerator.computeNonce(ClockFactory.get())),
-					null,
-					null,
-					Collections.emptyList(),
-					null,
-					new RestAPIParams.Message.AllowedMentions(
-							Collections.emptyList(),
-							Collections.emptyList(),
-							Collections.emptyList(),
-							false
-					),
-					null,
-					null
-				);
-				new Logger("FakeStickers").debug(message.toString());
-				Utils.threadPool.execute(() -> {
-					//Subscriptions in Java, because you can't do msg.subscribe() like in Kotlin
-					RxUtils.subscribe(
-							RestAPI.getApi().sendMessage(StoreStream.getChannelsSelected().getId(), message),
-							RxUtils.createActionSubscriber(zz -> {})
-					);
-				});
+                var sticker = ((StickerItem) param.args[0]).getSticker();
 
-				// Skip original method
-				param.setResult(null);
+                RestAPIParams.Message message = new RestAPIParams.Message(
+                    "https://media.discordapp.net/stickers/"+sticker.d()+sticker.b()+"?size=160",
+                    Long.toString(NonceGenerator.computeNonce(ClockFactory.get())),
+                    null,
+                    null,
+                    Collections.emptyList(),
+                    null,
+                    new RestAPIParams.Message.AllowedMentions(
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        false
+                    ),
+                    null,
+                    null
+                );
+                logger.debug(message.toString());
+                Utils.threadPool.execute(() -> {
+                    // Subscriptions in Java, because you can't do msg.subscribe() like in Kotlin
+                    RxUtils.subscribe(
+                        RestAPI.getApi().sendMessage(StoreStream.getChannelsSelected().getId(), message),
+                        RxUtils.createActionSubscriber(zz -> {})
+                    );
+                });
 
-				// Dismiss sticker picker
-				var stickerListener = (WidgetChatInputAttachments$createAndConfigureExpressionFragment$stickerPickerListener$1) // What a classname jeez
-						ReflectUtils.getField(param.thisObject, "stickerPickerListener");
-				//.s here is FlexInputFragment's FlexInputViewModel property (obfuscated to s)
-				WidgetChatInputAttachments.access$getFlexInputFragment$p(stickerListener.this$0).s.hideExpressionTray();
-			} catch (Throwable ignored) {
-			}
-		}));
-	}
+                // Skip original method
+                param.setResult(null);
 
-	@Override
-	// Called when your plugin is stopped
-	public void stop(Context context) {
-		// Remove all patches
-		patcher.unpatchAll();
-	}
-}
+                // Dismiss sticker picker
+                var stickerListener = (WidgetChatInputAttachments$createAndConfigureExpressionFragment$stickerPickerListener$1)
+                    ReflectUtils.getField(param.thisObject, "stickerPickerListener");
+                WidgetChatInputAttachments.access$getFlexInputFragment$p(stickerListener.this$0).s.hideExpressionTray();
+            } catch (Throwable ignored) {
+                logger.error("Error in sticker selection patch", ignored);
+            }
+        }));
 
-/*
-This plugin was mainly written as a learning exercise in order to
-figure out how to send links on tap since it would be required to
-send custom stickers. Whether or not custom stickers will ever
-happen remains to be seen...
+        // Add configurable sticker size feature
+        patcher.patch(WidgetChatListAdapterItemSticker.class.getDeclaredMethod("onConfigure", int.class, ChatListEntry.class), new AfterHook(param -> {
+            try {
+                if (bindingField != null) {
+                    WidgetChatListAdapterItemStickerBinding binding = (WidgetChatListAdapterItemStickerBinding) bindingField.get(param.thisObject);
+                    int stickerSize = Integer.parseInt(settings.getString("stickerSize", DEFAULT_STICKER_SIZE));
+                    
+                    binding.b.getLayoutParams().height = stickerSize;
+                    binding.b.getLayoutParams().width = stickerSize;
+                }
+            } catch (Exception e) {
+                logger.error("Error in sticker size patch", e);
+            }
+        }));
+    }
 
+    @Override
+    public void stop(Context context) {
+        patcher.unpatchAll();
+    }
 
-Copyright (C) Rhythm Lunatic 2021
+    public static class FakeStickersSettings extends BottomSheet {
+        private final SettingsAPI settings;
+        private int stickerSize;
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+        public FakeStickersSettings(SettingsAPI settings) {
+            this.settings = settings;
+            this.stickerSize = Integer.parseInt(settings.getString("stickerSize", DEFAULT_STICKER_SIZE));
+        }
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+        @Override
+        public void onViewCreated(View view, Bundle bundle) {
+            super.onViewCreated(view, bundle);
+            Context ctx = view.getContext();
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
+            TextView currentSize = new TextView(ctx, null, 0, R.i.UiKit_TextView);
+            currentSize.setText(stickerSize + " px");
+            currentSize.setWidth(DimenUtils.dpToPx(45));
+
+            SeekBar slider = new SeekBar(ctx, null, 0, R.i.UiKit_SeekBar);
+            LinearLayout.LayoutParams sliderParams = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT
+            );
+            slider.setLayoutParams(sliderParams);
+            slider.setMax(700);
+            slider.setProgress(stickerSize - 100);
+            slider.setPadding(DimenUtils.dpToPx(12), 0, DimenUtils.dpToPx(12), 0);
+            slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    currentSize.setText((progress + 100) + " px");
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                    stickerSize = seekBar.getProgress() + 100;
+                    settings.setString("stickerSize", String.valueOf(stickerSize));
+                }
+            });
+
+            Button resetButton = new Button(ctx);
+            resetButton.setText("Reset");
+            LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT
+            );
+            buttonParams.setMargins(DimenUtils.dpToPx(12), 0, DimenUtils.dpToPx(12), 0);
+            resetButton.setLayoutParams(buttonParams);
+            resetButton.setOnClickListener(v -> {
+                currentSize.setText("240 px");
+                slider.setProgress(140);
+                stickerSize = 240;
+                settings.setString("stickerSize", DEFAULT_STICKER_SIZE);
+            });
+
+            TextView title = new TextView(ctx, null, 0, R.i.UiKit_Settings_Item_Label);
+            title.setText("Sticker size (pixels)");
+            addView(title);
+
+            LinearLayout sliderContainer = new LinearLayout(ctx, null, 0, R.i.UiKit_Settings_Item);
+            sliderContainer.addView(currentSize);
+            sliderContainer.addView(slider);
+            addView(sliderContainer);
+
+            addView(resetButton);
+
+            TextView note = new TextView(ctx, null, 0, R.i.UiKit_Settings_Item_Label);
+            note.setText("Changes will apply after reloading the current channel");
+            note.setTextSize(DimenUtils.dpToPx(4));
+            addView(note);
+        }
+    }
+	    }
