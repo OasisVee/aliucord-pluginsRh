@@ -26,7 +26,7 @@ public class FakeStickersSettings extends BottomSheet {
     @Override
     public void onViewCreated(View view, Bundle bundle) {
         super.onViewCreated(view, bundle);
-        Context ctx = view.context;
+        Context ctx = view.getContext();
         
         int stickerSize = settings.getInt("stickerSize", DEFAULT_STICKER_SIZE);
         
@@ -88,4 +88,4 @@ public class FakeStickersSettings extends BottomSheet {
         noteView.setTextSize(DimenUtils.dpToPx(4));
         addView(noteView);
     }
-          }
+}
