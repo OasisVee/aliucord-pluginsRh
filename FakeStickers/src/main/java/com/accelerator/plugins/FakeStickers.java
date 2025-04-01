@@ -1,13 +1,9 @@
 package com.accelerator.plugins;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.*;
-import android.widget.SeekBar.OnSeekBarChangeListener;
-import android.widget.ImageView;
 
 import com.aliucord.Http;
 import com.aliucord.Utils;
@@ -17,12 +13,7 @@ import com.aliucord.patcher.InsteadHook;
 import com.aliucord.patcher.PreHook;
 import com.aliucord.api.SettingsAPI;
 import com.aliucord.utils.ReflectUtils;
-import com.aliucord.utils.DimenUtils;
-import com.aliucord.views.Button;
-import com.aliucord.widgets.BottomSheet;
-import com.aliucord.settings.delegate;
 
-import com.discord.widgets.chat.input.WidgetChatInputAttachments;
 import com.discord.widgets.chat.input.sticker.*;
 import com.discord.utilities.stickers.StickerUtils;
 import com.discord.utilities.rest.RestAPI;
@@ -33,7 +24,6 @@ import com.aliucord.utils.RxUtils;
 import java.util.Collections;
 import com.discord.stores.StoreStream;
 import java.lang.reflect.Method;
-import com.lytefast.flexinput.R;
 
 @SuppressWarnings("unused")
 @AliucordPlugin
